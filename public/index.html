@@ -555,7 +555,44 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            showError('Transcription API endpoint not yet configured.');
+
+            const activeTab = document.querySelector('.tab-content.active').id;
+            const hasFile = audioFile.files && audioFile.files.length > 0;
+
+            if (!hasFile) {
+                showError('Please upload an audio file or record a voice note');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', audioFile.files[0]);
+            formData.append('model', document.getElementById('model-select').value);
+
+            loading.style.display = 'block';
+            output.style.display = 'none';
+            error.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Transcription failed');
+                    return;
+                }
+
+                document.getElementById('transcript-text').textContent = data.text;
+                document.getElementById('language').textContent = data.language || 'Unknown';
+                output.style.display = 'block';
+            } catch (err) {
+                showError('Network error: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
         });
 
         function showError(message) {
