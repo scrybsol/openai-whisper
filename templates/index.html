@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Transcriber</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-input-wrapper:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+        
+        .file-input-text {
+            color: #667eea;
+            font-weight: 500;
+            pointer-events: none;
+        }
+        
+        .file-name {
+            color: #666;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+            background: white;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-transcribe {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-transcribe:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-transcribe:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-clear {
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .output {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .output-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .transcript {
+            color: #555;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        
+        .metadata {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 13px;
+            color: #999;
+        }
+        
+        .error {
+            padding: 12px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 6px;
+            color: #c33;
+            font-size: 13px;
+            display: none;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Whisper Transcriber</h1>
+        <p class="subtitle">Convert speech to text using OpenAI's Whisper model</p>
+        
+        <div class="error" id="error-message"></div>
+        
+        <form id="transcribe-form">
+            <div class="form-group">
+                <label>Audio File</label>
+                <div class="file-input-wrapper" id="file-input-wrapper">
+                    <input type="file" id="audio-file" accept="audio/*" required>
+                    <div class="file-input-text">📁 Click to upload or drag and drop</div>
+                    <div class="file-name" id="file-name"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="model-select">Model Size</label>
+                <select id="model-select">
+                    <option value="tiny">Tiny (fastest, less accurate)</option>
+                    <option value="base" selected>Base (balanced)</option>
+                    <option value="small">Small (more accurate)</option>
+                    <option value="medium">Medium (high accuracy)</option>
+                    <option value="large">Large (highest accuracy)</option>
+                </select>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn-transcribe">Transcribe</button>
+                <button type="reset" class="btn-clear">Clear</button>
+            </div>
+        </form>
+        
+        <div class="loading" id="loading">
+            <span class="spinner"></span>
+            Transcribing audio...
+        </div>
+        
+        <div class="output" id="output">
+            <div class="output-title">Transcript</div>
+            <div class="transcript" id="transcript-text"></div>
+            <div class="metadata">
+                <strong>Language:</strong> <span id="language"></span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('transcribe-form');
+        const audioFile = document.getElementById('audio-file');
+        const fileInputWrapper = document.getElementById('file-input-wrapper');
+        const fileName = document.getElementById('file-name');
+        const loading = document.getElementById('loading');
+        const output = document.getElementById('output');
+        const error = document.getElementById('error-message');
+        
+        // File input handling
+        fileInputWrapper.addEventListener('click', () => audioFile.click());
+        
+        fileInputWrapper.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileInputWrapper.style.borderColor = '#764ba2';
+            fileInputWrapper.style.background = '#f8f9ff';
+        });
+        
+        fileInputWrapper.addEventListener('dragleave', () => {
+            fileInputWrapper.style.borderColor = '#667eea';
+            fileInputWrapper.style.background = '';
+        });
+        
+        fileInputWrapper.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInputWrapper.style.borderColor = '#667eea';
+            fileInputWrapper.style.background = '';
+            audioFile.files = e.dataTransfer.files;
+            updateFileName();
+        });
+        
+        audioFile.addEventListener('change', updateFileName);
+        
+        function updateFileName() {
+            if (audioFile.files.length > 0) {
+                fileName.textContent = audioFile.files[0].name;
+            } else {
+                fileName.textContent = '';
+            }
+        }
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!audioFile.files.length) {
+                showError('Please select an audio file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', audioFile.files[0]);
+            formData.append('model', document.getElementById('model-select').value);
+            
+            loading.style.display = 'block';
+            output.style.display = 'none';
+            error.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.error || 'Transcription failed');
+                    return;
+                }
+                
+                document.getElementById('transcript-text').textContent = data.text;
+                document.getElementById('language').textContent = data.language || 'Unknown';
+                output.style.display = 'block';
+            } catch (err) {
+                showError('Network error: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+        
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+        
+        form.addEventListener('reset', () => {
+            fileName.textContent = '';
+            output.style.display = 'none';
+            error.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
