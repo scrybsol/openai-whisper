@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const app = express();
 
 app.use(express.static('public'));
@@ -17,7 +18,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Mock transcription for demo - returns sample text
+// Real transcription using whisper Python module
 app.post('/api/transcribe', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
@@ -26,47 +27,80 @@ app.post('/api/transcribe', upload.single('file'), (req, res) => {
 
     const filePath = req.file.path;
     const modelSize = req.body.model || 'base';
+    const outputDir = '/tmp/whisper_output';
 
-    console.log(`Processing ${req.file.originalname} with model ${modelSize}...`);
+    // Ensure output directory exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
 
-    // Simulate transcription delay
-    setTimeout(() => {
-      const mockTranscriptions = [
-        {
-          text: "Hello, this is a test recording. The transcription service is working perfectly. You can now transcribe audio files or voice recordings.",
-          language: "en"
-        },
-        {
-          text: "This is another sample transcription. The Whisper model can detect and transcribe speech in multiple languages with high accuracy.",
-          language: "en"
-        },
-        {
-          text: "Welcome to the Whisper transcriber application. You can upload audio files or record voice notes to get accurate transcriptions.",
-          language: "en"
+    console.log(`Transcribing ${req.file.originalname} with model ${modelSize}...`);
+
+    // Run whisper using Python module
+    const pythonProcess = spawn('python3', [
+      '-m', 'whisper',
+      filePath,
+      '--model', modelSize,
+      '--output_format', 'json',
+      '--output_dir', outputDir
+    ]);
+
+    let stderr = '';
+    let stdout = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.log('Whisper stderr:', data.toString());
+    });
+
+    pythonProcess.on('close', (code) => {
+      try {
+        // Clean up input file
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
-      ];
 
-      const mockResult = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
+        if (code !== 0) {
+          console.error('Whisper failed with code', code, stderr);
+          return res.status(500).json({
+            error: 'Transcription failed. Ensure Whisper is installed: pip install openai-whisper'
+          });
+        }
 
-      // Clean up uploaded file
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+        // Read the JSON output
+        const outputFile = path.join(outputDir, path.basename(filePath) + '.json');
+        if (!fs.existsSync(outputFile)) {
+          return res.status(500).json({ error: 'Transcription output not found' });
+        }
+
+        const result = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
+
+        // Clean up output file
+        fs.unlinkSync(outputFile);
+
+        res.json({
+          text: result.text,
+          segments: result.segments || [],
+          language: result.language || 'unknown'
+        });
+      } catch (err) {
+        console.error('Error processing result:', err);
+        res.status(500).json({ error: err.message });
       }
+    });
 
-      res.json({
-        text: mockResult.text,
-        segments: [{ id: 0, seek: 0, start: 0, end: 10, text: mockResult.text, tokens: [], temperature: 0, avg_logprob: -0.5, compression_ratio: 1.2, no_speech_prob: 0.001 }],
-        language: mockResult.language
-      });
-    }, 1500);
   } catch (error) {
     console.error('Error:', error);
-    
+
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message || 'Processing failed'
     });
   }
