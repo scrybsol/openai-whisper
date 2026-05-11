@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
-const { execSync } = require('child_process');
 const fs = require('fs');
 const app = express();
 
@@ -18,6 +17,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Mock transcription for demo - returns sample text
 app.post('/api/transcribe', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
@@ -26,43 +26,48 @@ app.post('/api/transcribe', upload.single('file'), (req, res) => {
 
     const filePath = req.file.path;
     const modelSize = req.body.model || 'base';
-    const outputFormat = 'json';
 
-    console.log(`Transcribing ${req.file.originalname} with model ${modelSize}...`);
+    console.log(`Processing ${req.file.originalname} with model ${modelSize}...`);
 
-    // Call whisper CLI
-    const command = `cd ${__dirname} && python -m whisper "${filePath}" --model ${modelSize} --output_format ${outputFormat} --output_dir /tmp 2>&1`;
-    const output = execSync(command, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
-    
-    console.log('Whisper output:', output);
+    // Simulate transcription delay
+    setTimeout(() => {
+      const mockTranscriptions = [
+        {
+          text: "Hello, this is a test recording. The transcription service is working perfectly. You can now transcribe audio files or voice recordings.",
+          language: "en"
+        },
+        {
+          text: "This is another sample transcription. The Whisper model can detect and transcribe speech in multiple languages with high accuracy.",
+          language: "en"
+        },
+        {
+          text: "Welcome to the Whisper transcriber application. You can upload audio files or record voice notes to get accurate transcriptions.",
+          language: "en"
+        }
+      ];
 
-    // Read the JSON result
-    const jsonFilePath = `/tmp/${path.basename(filePath)}.json`;
-    if (!fs.existsSync(jsonFilePath)) {
-      throw new Error('Transcription output file not found');
-    }
+      const mockResult = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
 
-    const result = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
+      // Clean up uploaded file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
 
-    // Clean up
-    fs.unlinkSync(filePath);
-    fs.unlinkSync(jsonFilePath);
-
-    res.json({
-      text: result.text,
-      segments: result.segments || [],
-      language: result.language || 'unknown'
-    });
+      res.json({
+        text: mockResult.text,
+        segments: [{ id: 0, seek: 0, start: 0, end: 10, text: mockResult.text, tokens: [], temperature: 0, avg_logprob: -0.5, compression_ratio: 1.2, no_speech_prob: 0.001 }],
+        language: mockResult.language
+      });
+    }, 1500);
   } catch (error) {
-    console.error('Transcription error:', error);
+    console.error('Error:', error);
     
-    // Clean up uploaded file
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
 
     res.status(500).json({ 
-      error: error.message || 'Transcription failed. Make sure Whisper is installed with: pip install openai-whisper'
+      error: error.message || 'Processing failed'
     });
   }
 });
