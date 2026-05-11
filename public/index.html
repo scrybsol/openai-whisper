@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Transcriber</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-input-wrapper:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+        
+        .file-input-text {
+            color: #667eea;
+            font-weight: 500;
+            pointer-events: none;
+        }
+        
+        .file-name {
+            color: #666;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+            background: white;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-transcribe {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-transcribe:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-transcribe:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-clear {
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .output {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .output-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .transcript {
+            color: #555;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        
+        .metadata {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 13px;
+            color: #999;
+        }
+        
+        .error {
+            padding: 12px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 6px;
+            color: #c33;
+            font-size: 13px;
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            color: #999;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .recorder-box {
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            background: #f8f9ff;
+        }
+
+        .recorder-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .mic-icon {
+            font-size: 28px;
+        }
+
+        .recorder-time {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .recorder-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .btn-record, .btn-stop {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-record {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-record:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .btn-stop {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #ee5a52;
+            transform: translateY(-2px);
+        }
+
+        .recorded-file {
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .btn-replay {
+            padding: 8px 16px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .btn-replay:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Whisper Transcriber</h1>
+        <p class="subtitle">Convert speech to text using OpenAI's Whisper model</p>
+        
+        <div class="error" id="error-message"></div>
+        
+        <form id="transcribe-form">
+            <div class="tabs">
+                <button type="button" class="tab-btn active" data-tab="upload">Upload File</button>
+                <button type="button" class="tab-btn" data-tab="record">Record Voice</button>
+            </div>
+
+            <div class="tab-content active" id="upload-tab">
+                <div class="form-group">
+                    <label>Audio File</label>
+                    <div class="file-input-wrapper" id="file-input-wrapper">
+                        <input type="file" id="audio-file" accept="audio/*">
+                        <div class="file-input-text">📁 Click to upload or drag and drop</div>
+                        <div class="file-name" id="file-name"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="record-tab">
+                <div class="form-group">
+                    <div class="recorder-box">
+                        <div class="recorder-status" id="recorder-status">
+                            <span class="mic-icon">🎤</span>
+                            <span id="recorder-text">Ready to record</span>
+                        </div>
+                        <div class="recorder-time" id="recorder-time" style="display:none;">
+                            <span id="timer">00:00</span>
+                        </div>
+                        <div class="recorder-buttons">
+                            <button type="button" class="btn-record" id="btn-record">Start Recording</button>
+                            <button type="button" class="btn-stop" id="btn-stop" style="display:none;">Stop Recording</button>
+                        </div>
+                        <div class="recorded-file" id="recorded-file" style="display:none;">
+                            <span>✓ Recording saved</span>
+                            <button type="button" class="btn-replay" id="btn-replay">🔊 Play</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="model-select">Model Size</label>
+                <select id="model-select">
+                    <option value="tiny">Tiny (fastest, less accurate)</option>
+                    <option value="base" selected>Base (balanced)</option>
+                    <option value="small">Small (more accurate)</option>
+                    <option value="medium">Medium (high accuracy)</option>
+                    <option value="large">Large (highest accuracy)</option>
+                </select>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn-transcribe">Transcribe</button>
+                <button type="reset" class="btn-clear">Clear</button>
+            </div>
+        </form>
+        
+        <div class="loading" id="loading">
+            <span class="spinner"></span>
+            Transcribing audio...
+        </div>
+        
+        <div class="output" id="output">
+            <div class="output-title">Transcript</div>
+            <div class="transcript" id="transcript-text"></div>
+            <div class="metadata">
+                <strong>Language:</strong> <span id="language"></span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('transcribe-form');
+        const audioFile = document.getElementById('audio-file');
+        const fileInputWrapper = document.getElementById('file-input-wrapper');
+        const fileName = document.getElementById('file-name');
+        const loading = document.getElementById('loading');
+        const output = document.getElementById('output');
+        const error = document.getElementById('error-message');
+
+        // Tab switching
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = btn.dataset.tab;
+
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+
+        // File upload handling
+        fileInputWrapper.addEventListener('click', () => audioFile.click());
+
+        fileInputWrapper.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileInputWrapper.style.borderColor = '#764ba2';
+            fileInputWrapper.style.background = '#f8f9ff';
+        });
+
+        fileInputWrapper.addEventListener('dragleave', () => {
+            fileInputWrapper.style.borderColor = '#667eea';
+            fileInputWrapper.style.background = '';
+        });
+
+        fileInputWrapper.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInputWrapper.style.borderColor = '#667eea';
+            fileInputWrapper.style.background = '';
+            audioFile.files = e.dataTransfer.files;
+            updateFileName();
+        });
+
+        audioFile.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (audioFile.files.length > 0) {
+                fileName.textContent = audioFile.files[0].name;
+            } else {
+                fileName.textContent = '';
+            }
+        }
+
+        // Voice recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let recordingStartTime;
+        let timerInterval;
+
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnReplay = document.getElementById('btn-replay');
+        const recorderText = document.getElementById('recorder-text');
+        const recorderTime = document.getElementById('recorder-time');
+        const recordedFileDiv = document.getElementById('recorded-file');
+        const timer = document.getElementById('timer');
+
+        btnRecord.addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];
+                recordingStartTime = Date.now();
+
+                mediaRecorder.ondataavailable = (e) => {
+                    recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+
+                    const dataTransfer = new DataTransfer();
+                    const file = new File([blob], 'recording.webm', { type: 'audio/webm' });
+                    dataTransfer.items.add(file);
+                    audioFile.files = dataTransfer.files;
+
+                    recordedFileDiv.style.display = 'flex';
+                    btnReplay.onclick = () => {
+                        const url = URL.createObjectURL(blob);
+                        const audio = new Audio(url);
+                        audio.play();
+                    };
+                };
+
+                mediaRecorder.start();
+                btnRecord.style.display = 'none';
+                btnStop.style.display = 'flex';
+                recorderText.textContent = 'Recording...';
+                recorderTime.style.display = 'block';
+                recordedFileDiv.style.display = 'none';
+
+                timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                    const secs = String(elapsed % 60).padStart(2, '0');
+                    timer.textContent = `${mins}:${secs}`;
+                }, 100);
+            } catch (err) {
+                showError('Microphone access denied. Please enable microphone permissions.');
+            }
+        });
+
+        btnStop.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                clearInterval(timerInterval);
+                btnRecord.style.display = 'flex';
+                btnStop.style.display = 'none';
+                recorderText.textContent = 'Recording saved';
+                recorderTime.style.display = 'none';
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const activeTab = document.querySelector('.tab-content.active').id;
+            const hasFile = audioFile.files && audioFile.files.length > 0;
+
+            if (!hasFile) {
+                showError('Please upload an audio file or record a voice note');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', audioFile.files[0]);
+            formData.append('model', document.getElementById('model-select').value);
+
+            loading.style.display = 'block';
+            output.style.display = 'none';
+            error.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Transcription failed');
+                    return;
+                }
+
+                document.getElementById('transcript-text').textContent = data.text;
+                document.getElementById('language').textContent = data.language || 'Unknown';
+                output.style.display = 'block';
+            } catch (err) {
+                showError('Network error: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        form.addEventListener('reset', () => {
+            fileName.textContent = '';
+            recordedFileDiv.style.display = 'none';
+            btnRecord.style.display = 'flex';
+            btnStop.style.display = 'none';
+            recorderText.textContent = 'Ready to record';
+            recorderTime.style.display = 'none';
+            output.style.display = 'none';
+            error.style.display = 'none';
+            if (timerInterval) clearInterval(timerInterval);
+        });
+    </script>
+</body>
+</html>
