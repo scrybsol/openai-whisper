@@ -36,13 +36,11 @@ app.post('/api/transcribe', upload.single('file'), (req, res) => {
 
     console.log(`Transcribing ${req.file.originalname} with model ${modelSize}...`);
 
-    // Run whisper using Python module
+    // Run transcription using Python helper script
     const pythonProcess = spawn('python3', [
-      '-m', 'whisper',
+      path.join(__dirname, 'transcribe.py'),
       filePath,
-      '--model', modelSize,
-      '--output_format', 'json',
-      '--output_dir', outputDir
+      modelSize
     ]);
 
     let stderr = '';
@@ -65,22 +63,20 @@ app.post('/api/transcribe', upload.single('file'), (req, res) => {
         }
 
         if (code !== 0) {
-          console.error('Whisper failed with code', code, stderr);
-          return res.status(500).json({
-            error: 'Transcription failed. Ensure Whisper is installed: pip install openai-whisper'
-          });
+          console.error('Transcription failed:', stderr);
+          try {
+            const errorJson = JSON.parse(stderr);
+            return res.status(500).json({ error: errorJson.error || 'Transcription failed' });
+          } catch {
+            return res.status(500).json({ error: stderr || 'Transcription failed' });
+          }
         }
 
-        // Read the JSON output
-        const outputFile = path.join(outputDir, path.basename(filePath) + '.json');
-        if (!fs.existsSync(outputFile)) {
-          return res.status(500).json({ error: 'Transcription output not found' });
+        const result = JSON.parse(stdout);
+
+        if (result.error) {
+          return res.status(500).json({ error: result.error });
         }
-
-        const result = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
-
-        // Clean up output file
-        fs.unlinkSync(outputFile);
 
         res.json({
           text: result.text,
